@@ -1,0 +1,103 @@
+import bpy
+
+
+#********************************************
+# TO RUN THIS CODE PROPERLY YOU MUST FIRST
+
+# SET THE materialLoc VARIABLE AS THE LOCATION
+# OF YOUR .dae FILES LIKE IN THIS EXAMPLE
+
+# SET THE spectralLoc VARIABLE AS THE LOCATION
+# OF YOUR .dae
+
+
+
+# YOU SHOULD BE LEFT WITH TWO PARENT MESHES IN YOUR COLLECTION
+# AND EVERY SUB MESH OF THE SECOND HAS ITS SHAPE KEYS, and COLORS ANIMATED
+
+# YOU CAN JUST GO AHEAD AND DELETE THE OTHER PARENT AND CHILDREN 
+#the one without .001 at the end of it aka the one at the end
+#THE ONE That's away from the origin
+
+#********************************************
+
+
+materialLoc = "D:\Big Delete\Material\Material.dae"
+spectralLoc = "D:\Big Delete\Tru Spectral\Tru Spectral.dae"
+
+COLLADA_FILE_THEY_CAN_SHAPE_ON_YOUR_KEYS = materialLoc
+WHAT_PITIFUL_COLLADA_HAVE_I_COME_TO_INHABIT = spectralLoc
+
+
+bpy.ops.wm.collada_import(filepath=COLLADA_FILE_THEY_CAN_SHAPE_ON_YOUR_KEYS)
+
+materialName =  bpy.data.collections['Collection'].objects[0].name
+spectralName = materialName + ".001"
+
+bpy.ops.object.select_all(action='DESELECT')
+
+bpy.ops.wm.collada_import(filepath=WHAT_PITIFUL_COLLADA_HAVE_I_COME_TO_INHABIT)
+
+bpy.data.collections['Collection'].objects[0].location.x = 40
+
+
+
+
+for obj in bpy.data.objects[spectralName].children:
+    ind=bpy.data.objects[spectralName].children.index(obj)
+    materialObj = bpy.data.objects[materialName].children[ind]
+    materialObj.select_set(True)
+    obj.select_set(True)
+    obj.data.use_auto_smooth = True
+    bpy.context.view_layer.objects.active = obj
+    #Mat is active objects active material
+    Mat = bpy.context.object.active_material
+    #Makes Sure the Material uses nodes
+    Mat.use_nodes = True
+    #MatNodes The nodes within the node tree of Mat
+    MatNodes = Mat.node_tree.nodes
+    #Specifically the MixRGB Node
+    MixNode = MatNodes.new('ShaderNodeMixRGB')
+    #Sets the Location Factor and Blend Type of the node
+    MixNode.location = (-100,-100)
+    MixNode.inputs["Fac"].default_value = 1.0
+    MixNode.blend_type = 'COLOR'
+    #Adding a Vertex node and its Location
+    VertexNode = MatNodes.new('ShaderNodeVertexColor')
+    VertexNode.location = (-300,-250)
+    #set Inputs and Outputs
+    #Over here we could also use MixNode and VertexNode but for consistent syntax I haven't
+    BaseColorOut = MatNodes["Image Texture"].outputs["Color"]
+    MixInColor1 = MatNodes["Mix"].inputs["Color1"]
+    MixInColor2 = MatNodes["Mix"].inputs["Color2"]
+    VertexOut = MatNodes["Vertex Color"].outputs["Color"]
+    Mat.node_tree.links.new(BaseColorOut, MixInColor1)
+    Mat.node_tree.links.new(VertexOut, MixInColor2)
+    #Connecting Mix out to BSDF input
+    MixOut = MatNodes["Mix"].outputs["Color"]
+    BSDFin = MatNodes["Principled BSDF"].inputs["Base Color"]   
+    Mat.node_tree.links.new(MixOut, BSDFin)
+    bpy.context.object.active_material.node_tree.nodes['Mix'].inputs['Fac'].keyframe_insert(data_path = "default_value", frame = 100)
+    bpy.context.object.active_material.node_tree.nodes["Mix"].inputs[0].default_value = 0
+    bpy.context.object.active_material.node_tree.nodes['Mix'].inputs['Fac'].keyframe_insert(data_path = "default_value", frame = 0)
+    bpy.ops.object.join_shapes()
+    #Need to add key frames for shapes
+    bpy.context.object.data.shape_keys.key_blocks[1].keyframe_insert(data_path = "value", frame = 100)
+    bpy.context.object.data.shape_keys.key_blocks[1].value = 1
+    bpy.context.object.data.shape_keys.key_blocks[1].keyframe_insert(data_path = "value", frame = 0)
+    bpy.ops.object.select_all(action='DESELECT')
+    
+
+#shades everything smooth
+bpy.ops.object.select_all(action='SELECT')
+bpy.ops.object.shade_smooth()
+
+
+bpy.ops.object.editmode_toggle()
+bpy.ops.mesh.select_all(action='SELECT')
+
+
+bpy.ops.mesh.remove_doubles()
+bpy.ops.object.editmode_toggle()
+
+bpy.ops.object.select_all(action='DESELECT')
